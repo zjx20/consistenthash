@@ -63,6 +63,17 @@ func TestHashing(t *testing.T) {
 		}
 	}
 
+	// Remove 8
+	hash.Remove("8")
+
+	// 27 should map to 2
+	testCases["27"] = "2"
+
+	for k, v := range testCases {
+		if hash.Get(k) != v {
+			t.Errorf("Asking for %s, should have yielded %s", k, v)
+		}
+	}
 }
 
 func TestConsistency(t *testing.T) {

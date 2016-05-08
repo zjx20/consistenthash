@@ -61,6 +61,19 @@ func (m *Map) Add(keys ...string) {
 	sort.Ints(m.keys)
 }
 
+// Remove a key from the hash.
+func (m *Map) Remove(key string) {
+	newKeys := []int{}
+	for _, v := range m.keys {
+		if m.hashMap[v] != key {
+			newKeys = append(newKeys, v)
+		} else {
+			delete(m.hashMap, v)
+		}
+	}
+	m.keys = newKeys
+}
+
 // Gets the closest item in the hash to the provided key.
 func (m *Map) Get(key string) string {
 	if m.IsEmpty() {
