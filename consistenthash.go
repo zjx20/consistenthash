@@ -53,7 +53,9 @@ func (m *Map) IsEmpty() bool {
 func (m *Map) Add(keys ...string) {
 	for _, key := range keys {
 		for i := 0; i < m.replicas; i++ {
+			// log.Printf("adding %v, replica %v", key, i+1)
 			hash := int(m.hash([]byte(strconv.Itoa(i) + key)))
+			// log.Printf("hash = %v", hash)
 			m.keys = append(m.keys, hash)
 			m.hashMap[hash] = key
 		}
@@ -63,6 +65,7 @@ func (m *Map) Add(keys ...string) {
 
 // Remove a key from the hash.
 func (m *Map) Remove(key string) {
+	// log.Printf("removing %v ", key)
 	newKeys := []int{}
 	for _, v := range m.keys {
 		if m.hashMap[v] != key {
