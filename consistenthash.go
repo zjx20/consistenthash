@@ -55,10 +55,15 @@ func (m *Map) IsEmpty() bool {
 
 // Adds some keys to the hash.
 func (m *Map) Add(keys ...string) {
+	oriNodes := m.nodes
+	m.nodes = make([]node, len(m.nodes)+len(keys)*m.replicas)
+	copy(m.nodes, oriNodes)
+	l := len(oriNodes)
 	for _, key := range keys {
 		for i := 0; i < m.replicas; i++ {
 			hash := m.hash([]byte(strconv.Itoa(i) + key))
-			m.nodes = append(m.nodes, node{hash: hash, key: key})
+			m.nodes[l] = node{hash: hash, key: key}
+			l++
 		}
 	}
 	sort.Slice(m.nodes, func(i, j int) bool {
