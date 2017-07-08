@@ -1,0 +1,4 @@
+package: github.com/zjx20/consistenthash
+import: []
+testImport:
+- package: github.com/OneOfOne/xxhash

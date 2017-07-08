@@ -1,0 +1,6 @@
+hash: fcaa27a37f91e534e8e19bd55f7f1dd1c512d1a28fc7bf59d485f4dcbef91042
+updated: 2017-07-08T23:05:56.508154288+08:00
+imports: []
+testImports:
+- name: github.com/OneOfOne/xxhash
+  version: 9f129ced0523605cdde14a954ae4609e366a7998
