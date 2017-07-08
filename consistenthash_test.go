@@ -22,6 +22,8 @@ import (
 	"hash/crc32"
 	"strconv"
 	"testing"
+
+	"github.com/OneOfOne/xxhash"
 )
 
 func TestHashing(t *testing.T) {
@@ -135,13 +137,19 @@ func TestCollision(t *testing.T) {
 	}
 }
 
-func BenchmarkGet8(b *testing.B)   { benchmarkGet(b, 8) }
-func BenchmarkGet32(b *testing.B)  { benchmarkGet(b, 32) }
-func BenchmarkGet128(b *testing.B) { benchmarkGet(b, 128) }
-func BenchmarkGet512(b *testing.B) { benchmarkGet(b, 512) }
+func BenchmarkGet8(b *testing.B)          { benchmarkGet(b, 8, nil) }
+func BenchmarkGet32(b *testing.B)         { benchmarkGet(b, 32, nil) }
+func BenchmarkGet128(b *testing.B)        { benchmarkGet(b, 128, nil) }
+func BenchmarkGet512(b *testing.B)        { benchmarkGet(b, 512, nil) }
+func BenchmarkGet2048(b *testing.B)       { benchmarkGet(b, 2048, nil) }
+func BenchmarkXxhashGet8(b *testing.B)    { benchmarkGet(b, 8, xxhash.Checksum32) }
+func BenchmarkXxhashGet32(b *testing.B)   { benchmarkGet(b, 32, xxhash.Checksum32) }
+func BenchmarkXxhashGet128(b *testing.B)  { benchmarkGet(b, 128, xxhash.Checksum32) }
+func BenchmarkXxhashGet512(b *testing.B)  { benchmarkGet(b, 512, xxhash.Checksum32) }
+func BenchmarkXxhashGet2048(b *testing.B) { benchmarkGet(b, 2048, xxhash.Checksum32) }
 
-func benchmarkGet(b *testing.B, shards int) {
-	hash := New(50, nil)
+func benchmarkGet(b *testing.B, shards int, fn Hash) {
+	hash := New(50, fn)
 
 	var buckets []string
 	for i := 0; i < shards; i++ {
