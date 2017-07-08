@@ -20,6 +20,9 @@ package consistenthash
 import (
 	"fmt"
 	"hash/crc32"
+	"math"
+	"reflect"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -135,6 +138,79 @@ func TestCollision(t *testing.T) {
 	if hash1.Get(v) != hash2.Get(v) {
 		t.Errorf("Hashes should be the same")
 	}
+}
+
+func avg(a []float64) (sum float64) {
+	for i := range a {
+		sum += a[i]
+	}
+	return sum / float64(len(a))
+}
+
+func stdDev(a []float64) (total float64) {
+	prom := avg(a)
+	for i := range a {
+		total += (a[i] - prom) * (a[i] - prom)
+	}
+	total = total / float64(len(a))
+	return math.Sqrt(total)
+}
+
+func getFunctionName(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+}
+
+func testBalance(t *testing.T, n int, nodes int, replicas int, fn Hash) {
+	hash := New(replicas, fn)
+	c := map[string]float64{}
+	var keys []string
+	for i := 0; i < nodes; i++ {
+		node := fmt.Sprintf("node-%d", i)
+		keys = append(keys, node)
+		c[node] = 0
+	}
+	hash.Add(keys...)
+	for i := 0; i < n; i++ {
+		v := hash.Get(fmt.Sprintf("key-%d", i))
+		c[v] += 1.0
+	}
+
+	var result []float64
+	max, min := float64(-1), float64(-1)
+	for _, v := range c {
+		result = append(result, v)
+		if max < v || max < 0 {
+			max = v
+		}
+		if min > v || min < 0 {
+			min = v
+		}
+	}
+	t.Logf("  nodes = %-6dreplicas = %-6dAvg: %-9.2f Stddev: %-9.2f Max: %-9.2f Min: %-9.2f",
+		nodes, replicas, avg(result), stdDev(result), max, min)
+}
+
+func testBalanceSuite(t *testing.T, fn Hash) {
+	nArr := []int{1000, 50000, 200000}
+	replicasArr := []int{10, 50, 128, 512}
+	nodesArr := []int{5, 16, 128, 512}
+	t.Logf("Testing balance with hash func: %s", getFunctionName(fn))
+	for _, n := range nArr {
+		t.Logf(" with n: %d", n)
+		for _, replicas := range replicasArr {
+			for _, nodes := range nodesArr {
+				testBalance(t, n, nodes, replicas, fn)
+			}
+		}
+	}
+}
+
+func TestBalance(t *testing.T) {
+	testBalanceSuite(t, nil)
+}
+
+func TestBalanceXxhash(t *testing.T) {
+	testBalanceSuite(t, xxhash.Checksum32)
 }
 
 func BenchmarkGet8(b *testing.B)          { benchmarkGet(b, 8, nil) }
