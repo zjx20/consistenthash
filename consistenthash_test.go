@@ -27,6 +27,8 @@ import (
 	"testing"
 
 	"github.com/OneOfOne/xxhash"
+	"github.com/bmaxa/trees/avl"
+	"github.com/bmaxa/trees/tree"
 )
 
 func TestHashing(t *testing.T) {
@@ -107,6 +109,54 @@ func TestConsistency(t *testing.T) {
 		hash1.Get("Bob") != hash2.Get("Bob") ||
 		hash1.Get("Bonny") != hash2.Get("Bonny") {
 		t.Errorf("Direct matches should always return the same entry")
+	}
+}
+
+func TestFloor(t *testing.T) {
+	tr := avl.New()
+	tr.Insert(tree.Item{Key: &node{hash: 10}})
+	tr.Insert(tree.Item{Key: &node{hash: 20}})
+	tr.Insert(tree.Item{Key: &node{hash: 30}})
+
+	testCases := []struct {
+		key   node
+		value tree.Iterator
+	}{
+		{
+			key:   node{hash: 0},
+			value: tr.Find(&node{hash: 10}),
+		},
+		{
+			key:   node{hash: 9},
+			value: tr.Find(&node{hash: 10}),
+		},
+		{
+			key:   node{hash: 10},
+			value: tr.Find(&node{hash: 10}),
+		},
+		{
+			key:   node{hash: 11},
+			value: tr.Find(&node{hash: 20}),
+		},
+		{
+			key:   node{hash: 21},
+			value: tr.Find(&node{hash: 30}),
+		},
+		{
+			key:   node{hash: 30},
+			value: tr.Find(&node{hash: 30}),
+		},
+		{
+			key:   node{hash: 100},
+			value: tr.End(),
+		},
+	}
+
+	for _, tc := range testCases {
+		iter := floor(&tr.Tree, &tc.key)
+		if iter != tc.value {
+			t.Errorf("Test case failed: %v", tc)
+		}
 	}
 }
 
@@ -205,13 +255,13 @@ func testBalanceSuite(t *testing.T, fn Hash) {
 	}
 }
 
-// func TestBalance(t *testing.T) {
-// 	testBalanceSuite(t, nil)
-// }
+func TestBalance(t *testing.T) {
+	testBalanceSuite(t, nil)
+}
 
-// func TestBalanceXxhash(t *testing.T) {
-// 	testBalanceSuite(t, xxhash.Checksum32)
-// }
+func TestBalanceXxhash(t *testing.T) {
+	testBalanceSuite(t, xxhash.Checksum32)
+}
 
 func BenchmarkGet8(b *testing.B)    { benchmarkGet(b, 8, nil) }
 func BenchmarkGet32(b *testing.B)   { benchmarkGet(b, 32, nil) }
@@ -267,3 +317,25 @@ func benchmarkConstruct(b *testing.B, shards int, fn Hash) {
 		hash.Add(buckets...)
 	}
 }
+
+func benchmarkAddAndRemove(b *testing.B, n int) {
+	hash := New(50, nil)
+	keys := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		keys = append(keys, fmt.Sprintf("node-%d", i))
+	}
+	hash.Add(keys...)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		hash.Add("node-100")
+		hash.Remove("node-100")
+	}
+}
+
+func BenchmarkAddAndRemove8(b *testing.B)    { benchmarkAddAndRemove(b, 8) }
+func BenchmarkAddAndRemove32(b *testing.B)   { benchmarkAddAndRemove(b, 32) }
+func BenchmarkAddAndRemove128(b *testing.B)  { benchmarkAddAndRemove(b, 128) }
+func BenchmarkAddAndRemove512(b *testing.B)  { benchmarkAddAndRemove(b, 512) }
+func BenchmarkAddAndRemove2048(b *testing.B) { benchmarkAddAndRemove(b, 2048) }

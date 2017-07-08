@@ -20,27 +20,55 @@ package consistenthash
 
 import (
 	"hash/crc32"
-	"sort"
 	"strconv"
+
+	"github.com/bmaxa/trees/rb"
+	"github.com/bmaxa/trees/tree"
 )
 
 type Hash func(data []byte) uint32
+
+var _ tree.Key = (*node)(nil)
 
 type node struct {
 	hash uint32
 	key  string
 }
 
+func (n *node) Less(than tree.Key) bool {
+	m := than.(*node)
+	if n.hash != m.hash {
+		return n.hash < m.hash
+	}
+	return n.key < m.key
+}
+
+func floor(t *tree.Tree, key tree.Key) tree.Iterator {
+	n, tmp := t.Root, (*tree.Node)(nil)
+	for n != nil {
+		if n.Key.Less(key) {
+			n = n.Right
+		} else {
+			tmp = n
+			n = n.Left
+		}
+	}
+	return tree.NewIter(tmp)
+}
+
 type Map struct {
 	hash     Hash
 	replicas int
-	nodes    []node // Sorted
+	nodes    *rb.RB
+	keys     map[string][]*node // for removal
 }
 
 func New(replicas int, fn Hash) *Map {
 	m := &Map{
 		replicas: replicas,
 		hash:     fn,
+		nodes:    rb.New(),
+		keys:     make(map[string][]*node),
 	}
 	if m.hash == nil {
 		m.hash = crc32.ChecksumIEEE
@@ -50,39 +78,38 @@ func New(replicas int, fn Hash) *Map {
 
 // Returns true if there are no items available.
 func (m *Map) IsEmpty() bool {
-	return len(m.nodes) == 0
+	return m.nodes.Size() == 0
 }
 
 // Adds some keys to the hash.
 func (m *Map) Add(keys ...string) {
-	oriNodes := m.nodes
-	m.nodes = make([]node, len(m.nodes)+len(keys)*m.replicas)
-	copy(m.nodes, oriNodes)
-	l := len(oriNodes)
 	for _, key := range keys {
+		if _, ok := m.keys[key]; ok {
+			// Already exists
+			continue
+		}
+		l := make([]*node, m.replicas)
 		for i := 0; i < m.replicas; i++ {
 			hash := m.hash([]byte(strconv.Itoa(i) + key))
-			m.nodes[l] = node{hash: hash, key: key}
-			l++
+			n := &node{hash: hash, key: key}
+			l[i] = n
+			m.nodes.Insert(tree.Item{
+				Key:   n,
+				Value: nil,
+			})
 		}
+		m.keys[key] = l
 	}
-	sort.Slice(m.nodes, func(i, j int) bool {
-		if m.nodes[i].hash != m.nodes[j].hash {
-			return m.nodes[i].hash < m.nodes[j].hash
-		}
-		return m.nodes[i].key < m.nodes[j].key
-	})
 }
 
 // Remove a key from the hash.
 func (m *Map) Remove(key string) {
-	newNodes := make([]node, 0, len(m.nodes))
-	for _, n := range m.nodes {
-		if n.key != key {
-			newNodes = append(newNodes, n)
+	if l, ok := m.keys[key]; ok {
+		for _, n := range l {
+			m.nodes.Delete(n)
 		}
+		delete(m.keys, key)
 	}
-	m.nodes = newNodes
 }
 
 // Gets the closest item in the hash to the provided key.
@@ -90,18 +117,11 @@ func (m *Map) Get(key string) string {
 	if m.IsEmpty() {
 		return ""
 	}
-
 	hash := m.hash([]byte(key))
-
-	// Binary search for appropriate replica.
-	idx := sort.Search(len(m.nodes), func(i int) bool {
-		return m.nodes[i].hash >= hash
-	})
-
-	// Means we have cycled back to the first replica.
-	if idx == len(m.nodes) {
-		idx = 0
+	n := node{hash: hash, key: key}
+	iter := floor(&m.nodes.Tree, &n)
+	if iter == m.nodes.End() {
+		iter = m.nodes.Begin()
 	}
-
-	return m.nodes[idx].key
+	return iter.Node().Key.(*node).key
 }

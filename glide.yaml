@@ -1,0 +1,5 @@
+package: github.com/zjx20/consistenthash
+import:
+- package: github.com/bmaxa/trees
+testImport:
+- package: github.com/OneOfOne/xxhash
